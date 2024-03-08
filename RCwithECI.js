@@ -7,6 +7,9 @@ const fs = require('fs');
 const FormData = require('form-data');
 const { type } = require('os');
 const axios = require('axios');
+const ffmpegPath = 'C:/Users/Awais/Downloads/ffmpeg-6.1.1-essentials_build/ffmpeg-6.1.1-essentials_build/bin/ffmpeg.exe';  // Replace with the actual path to your ffmpeg.exe
+const ffmpeg = require('fluent-ffmpeg');
+ffmpeg.setFfmpegPath(ffmpegPath);
 
 var usePKCE = false; // change to true for enabling authorization code with PKCE flow
 var access_token;
@@ -108,8 +111,8 @@ app.get('/test', async function(req, res) {
       } else if (req.query.api == "account-call-log") {
         var endpoint = "/restapi/v1.0/account/~/call-log"
         var params = {
-          dateFrom: "2024-02-02T00:00:00.577Z",
-          dateTo: "2024-02-05T23:59:59.577Z",
+          dateFrom: "2024-02-24T00:00:00.577Z",
+          dateTo: "2024-02-29T23:59:59.577Z",
           view: "Detailed",
           perPage: 200
         }
@@ -149,6 +152,7 @@ async function callGetMethodForPaging(platform, endpoint, params, res, access_to
         uri = record.recording.contentUri;
       } else {
         console.log('ContentUri is missing: ', uri);
+        console.log('ContentUri is missing: ', externalId);
       }
 
       if (record.from != undefined && record.from.name != undefined) {
@@ -554,10 +558,21 @@ async function downloadRecording(uri, access_token) {
 
     fileCounter++; // Increment the counter for each file
     const filename = `recording${fileCounter}.mp3`;
+    const filename2 = `stereo${fileCounter}.mp3`;
 
     await fs.promises.writeFile(filename, response.data);
     console.log(`File saved as ${filename}`);
-    return filename;
+
+    const inputfile = `C:/Users/Awais/OneDrive/Documents/RingCentral/${filename}`;
+    const outputfile = filename2;
+    try {
+      await runConversion(inputfile, outputfile);
+
+      return filename2;
+
+    } catch (error) {
+      console.log('not saved converted file: ', error);
+    }
 
   } catch (error) {
     if (error.response) {
@@ -568,4 +583,40 @@ async function downloadRecording(uri, access_token) {
     }
     return null;
   } 
+}
+
+// code for converting the mono call to stereo call
+async function convertMonoToStereo(inputFilePath, outputFilePath) {
+  return new Promise((resolve, reject) => {
+    if (!inputFilePath) {
+      reject(new Error('Input file path is empty'));
+      return;
+    }
+
+    ffmpeg()
+      .input(inputFilePath)
+      .audioChannels(2) // Convert to stereo
+      .audioCodec('libmp3lame')
+      .on('end', () => {
+        console.log('Conversion finished');
+        resolve();
+      })
+      .on('error', (err) => {
+        console.error('Error:', err);
+        reject(err);
+      })
+      .save(outputFilePath);
+  });
+}
+
+// converting the mono call to stereo call
+async function runConversion(inputfile, outputfile) {
+  const inputFilePath = inputfile;
+  const outputFilePath = `C:/Users/Awais/OneDrive/Documents/RingCentral/${outputfile}`;
+
+  try {
+    await convertMonoToStereo(inputFilePath, outputFilePath);
+  } catch (error) {
+    console.error('Conversion failed:', error);
+  }
 }
